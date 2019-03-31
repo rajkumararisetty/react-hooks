@@ -1,86 +1,82 @@
-import React, {useState} from 'react';
-import AppStylesCss from './App.module.css';
+import React, { Fragment, useState, useEffect } from 'react';
 
-const Todo = ({ todo, index, completeTodo, removeTodo }) => (
-  <div
-    className={AppStylesCss.todo}
-    style={{ textDecoration: todo.isCompleted ? 'line-through' : '' }}
-  >
-    {todo.text}
+const useDataApi = (initialUrl, initialData) => {
+  const [data, setData] = useState(initialData);
+  const [url, setUrl] = useState(initialUrl);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isError, setIsError] = useState(false);
 
-    <div>
-      <button onClick={() => completeTodo(index)}>Complete</button>
-      <button onClick={() => removeTodo(index)}>x</button>
-    </div>
-  </div>
-);
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsError(false);
+      setIsLoading(true);
 
-const TodoForm = ({ addTodo }) => {
-  const [value, setValue] = useState('');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!value) return;
-    addTodo(value);
-    setValue('');
-  };
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <input
-        type='text'
-        className='input'
-        value={value}
-        onChange={e => setValue(e.target.value)}
-      />
-    </form>
-  );
-};
-
-const App = () => {
-  const [todos, setTodos] = useState([
-    { text: 'Learn about React', isCompleted: false },
-    { text: 'Meet friend for lunch', isCompleted: false },
-    { text: 'Build really cool todo app', isCompleted: false },
-  ]);
-
-  const addTodo = (newTodo) => {
-    setTodos([...todos, { text: newTodo }]);
-  };
-
-  const completeTodo = (updateIndex) => {
-    const updatedTodos = todos.map((todo, index) => {
-      if (updateIndex === index) {
-        return Object.assign({}, todo, { isCompleted: true });
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          setIsError(true);
+        } else {
+          const data = await response.json();
+          setData(data);
+        }
+      } catch (error) {
+        setIsError(true);
       }
 
-      return todo;
-    });
+      setIsLoading(false);
+    };
 
-    setTodos(updatedTodos);
+    fetchData();
+  }, [url]);
+
+  const doFetch = url => {
+    setUrl(url);
   };
 
-  const removeTodo = (deleteIndex) => {
-    const updatedTodos = todos.filter((todo, index) => index !== deleteIndex);
-    setTodos(updatedTodos);
-  };
+  return { data, isLoading, isError, doFetch };
+};
+
+function App() {
+  const [query, setQuery] = useState('redux');
+  const { data, isLoading, isError, doFetch } = useDataApi(
+    'http://hn.algolia.com/api/v1/search?query=redux',
+    { hits: [] },
+  );
 
   return (
-    <div className={AppStylesCss.app}>
-      <div className={AppStylesCss['todo-list']}>
-        {todos.map((eachTodo, index) => (
-          <Todo
-            key={index}
-            index={index}
-            todo={eachTodo}
-            completeTodo={completeTodo}
-            removeTodo={removeTodo}
-          />
-        ))}
-        <TodoForm addTodo={addTodo} />
-      </div>
-    </div>
+    <Fragment>
+      <form
+        onSubmit={event => {
+          doFetch(
+            `http://hn.algolia.com/api/v1/search?query=${query}`,
+          );
+
+          event.preventDefault();
+        }}
+      >
+        <input
+          type="text"
+          value={query}
+          onChange={event => setQuery(event.target.value)}
+        />
+        <button type="submit">Search</button>
+      </form>
+
+      {isError && <div>Something went wrong ...</div>}
+
+      {isLoading ? (
+        <div>Loading ...</div>
+      ) : (
+        <ul>
+          {data.hits.map(item => (
+            <li key={item.objectID}>
+              <a href={item.url}>{item.title}</a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Fragment>
   );
-};
+}
 
 export default App;
